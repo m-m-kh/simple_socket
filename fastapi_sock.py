@@ -1,10 +1,12 @@
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import Response, HTMLResponse
+from fastapi import FastAPI, WebSocket, Form
+from fastapi.responses import Response, HTMLResponse, RedirectResponse
 from fastapi.requests import Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import asyncio
 import pathlib
+import aioconsole
+
 
 template = Jinja2Templates(pathlib.Path(__file__).parent/'templates')
 
@@ -24,6 +26,8 @@ async def check_socket(tasks, websocket: WebSocket):
         task:asyncio.Task
         task.cancel()
     
+    
+    
         
         
 
@@ -34,15 +38,17 @@ async def reciver(websocket: WebSocket):
         
 async def sender(websocket: WebSocket):
     while True:
-        txt = await asyncio.to_thread(input,':>>>>>>> ')
-        print(await websocket.send_text(txt))
+        txt = await aioconsole.ainput(f'{websocket.client}')
+        await websocket.send_text(txt)
+
+
 
 
 async def worker(websocket: WebSocket):
+    # inp = asyncio.create_task(aioconsole.ainput(f'{websocket.client}'))
     t1 = asyncio.create_task(reciver(websocket))
     t2 = asyncio.create_task(sender(websocket))
     t3 = asyncio.create_task(check_socket([t1,t2],websocket))
-
     await asyncio.gather(t1,t2,t3)
 
 
@@ -70,3 +76,15 @@ async def view_sockets(request:Request):
                                      context={
                                          'request':request,
                                          'sockets':sockets})
+
+@app.route('/send')
+async def bridge(request:Request):
+    socket = request.query_params.get('socket')
+    text = request.query_params.get('text')
+    
+    for sock in app.sockets:
+        if str(sock.client) == socket:
+            await sock.send_text(text)
+    
+    
+    return RedirectResponse('/')
